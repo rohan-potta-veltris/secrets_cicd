@@ -1,0 +1,44 @@
+name: CI
+
+# Runs on every PR and push to main. Deliberately has NO AWS access —
+# id-token/AWS permissions are only granted to fetch-secret.yml, so a PR
+# from a fork can never reach real AWS credentials.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r app/requirements-dev.txt
+
+      - name: Lint
+        run: ruff check app/
+
+      - name: Run unit tests
+        run: pytest app/tests/ -v
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
