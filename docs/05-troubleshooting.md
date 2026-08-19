@@ -21,11 +21,14 @@ hadn't considered. In order of likelihood:
 - **GitHub embeds immutable numeric IDs in `sub`.** Even after fixing the
   branch-vs-environment shape, the `sub` claim can look like
   `repo:owner@177530384/repo@1339256549:environment:production` — with IDs
-  spliced into the owner/repo names. A plain-text `StringLike` pattern like
-  `repo:owner/repo:*` will **not** match this, because the literal prefix
-  before the wildcard no longer matches character-for-character. Don't
-  guess — decode a real token and copy the exact value (see the debug
-  snippet in Step 3a).
+  spliced into the *middle* of the owner/repo names, not appended at the
+  end. A pattern like `repo:owner/repo:*` will **not** match this, because
+  the literal `owner/repo` text before the final `*` no longer matches
+  character-for-character (the ID lands before that point, not after). You
+  don't need to decode a token to fix this, though — put the wildcard right
+  after each name instead: `repo:owner*/repo*:environment:production`. Only
+  reach for decoding a real token (see Step 3a, Option B) if you want an
+  exact match with zero wildcards.
 - **AWS rejects a trust policy with no scoped `sub`/`job_workflow_ref`
   condition at all.** If you try to drop `sub` entirely and rely only on
   `repository`/`environment` conditions, AWS's console will refuse to save

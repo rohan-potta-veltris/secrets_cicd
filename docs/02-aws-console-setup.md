@@ -206,29 +206,11 @@ Two things are different once a job is gated by a GitHub Environment:
    `Not authorized to perform sts:AssumeRoleWithWebIdentity`
    (see [`05-troubleshooting.md`](05-troubleshooting.md)).
 
-**Don't guess this value — read it directly from a real token.** Temporarily
-add this step to your workflow, before the AWS credentials step, run it once
-manually, then delete it:
+You don't need to know your repo's exact immutable IDs up front — there are
+two valid ways to write this policy, and only one of them requires any
+extra work:
 
-```yaml
-- name: Debug - print OIDC token claims
-  run: |
-    IDTOKEN=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-      "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
-    PAYLOAD=$(echo -n "$IDTOKEN" | cut -d '.' -f2 | tr '_-' '/+')
-    case $(( ${#PAYLOAD} % 4 )) in
-      2) PAYLOAD="${PAYLOAD}==" ;;
-      3) PAYLOAD="${PAYLOAD}=" ;;
-    esac
-    echo "$PAYLOAD" | base64 -d | jq '{aud, sub, repository, ref, repository_owner, environment}'
-```
-
-This prints the real `sub` (and other claims) for that run's actual token.
-Copy the exact `sub` value it prints — IDs and all — into an **exact**
-match. Also notice the debug output includes a clean `repository` claim
-with **no** ID suffix — worth adding alongside `sub` as a second,
-human-readable condition (AWS requires a `sub` or `job_workflow_ref`
-condition either way, so you can't rely on `repository` alone):
+**Option A — wildcard the ID, works immediately for any new project (start here):**
 
 ```json
 {
@@ -243,9 +225,11 @@ condition either way, so you can't rely on `repository` alone):
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:production",
           "token.actions.githubusercontent.com:repository": "<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>",
           "token.actions.githubusercontent.com:environment": "production"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:<YOUR_GITHUB_USERNAME>*/<YOUR_REPO_NAME>*:environment:production"
         }
       }
     }
@@ -253,11 +237,63 @@ condition either way, so you can't rely on `repository` alone):
 }
 ```
 
-Every condition here is `StringEquals` — no wildcards — which is both what
-AWS's own policy validator prefers (it will warn on a wildcarded `sub`) and
-the tightest possible scope: this exact repo, running under exactly the
-`production` environment. Save the change, then delete the debug step from
-the workflow once you've confirmed a run succeeds.
+Just substitute your own owner/repo names — no debugging, no token
+decoding, nothing to look up. The trailing `*` after each name absorbs
+GitHub's optional `@<id>` suffix wherever it does or doesn't appear; the
+literal `repo:<owner>` and `/<repo>` text before each `*` still has to
+match exactly, so this isn't meaningfully looser than knowing the real IDs
+— a different repo's token can never satisfy this pattern. AWS's console
+will show an advisory warning about the wildcard in `sub` (it doesn't know
+the wildcard only ever consumes an internal ID), but it still saves fine —
+this is what actually got this repo working the first time.
+
+**Option B — exact match, no wildcards, for eliminating that warning:**
+
+If Option A works but you want to clear the console warning, or you just
+prefer zero wildcards, you can look up your repo's exact IDs by adding this
+step to your workflow temporarily, running it once, then deleting it:
+
+```yaml
+- name: Debug - print OIDC token claims
+  run: |
+    IDTOKEN=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+      "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
+    PAYLOAD=$(echo -n "$IDTOKEN" | cut -d '.' -f2 | tr '_-' '/+')
+    case $(( ${#PAYLOAD} % 4 )) in
+      2) PAYLOAD="${PAYLOAD}==" ;;
+      3) PAYLOAD="${PAYLOAD}=" ;;
+    esac
+    echo "$PAYLOAD" | base64 -d | jq '{aud, sub, repository, ref, repository_owner, environment}'
+```
+
+Then swap Option A's `StringLike` block for an exact `StringEquals` line
+using the printed `sub` value verbatim (IDs included):
+
+```json
+"token.actions.githubusercontent.com:sub": "repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:production"
+```
+
+This is optional hardening, not a requirement — Option A is already
+correctly scoped to this exact repo and environment. Save whichever
+version you choose.
+
+**Option C — match `job_workflow_ref` instead of `sub`:** AWS's validator
+error explicitly names this as the other accepted claim
+(`sub` **or** `job_workflow_ref`). Instead of pinning to a repo+environment,
+it pins to the actual **workflow file that ran**:
+
+```json
+"token.actions.githubusercontent.com:job_workflow_ref": "<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>/.github/workflows/fetch-secret.yml@refs/heads/main"
+```
+
+This isn't obviously better or worse than Options A/B — it's a different
+axis of coupling. `sub`-based matching breaks if you rename the
+environment; `job_workflow_ref`-based matching breaks if you rename or
+move the workflow file. Pick whichever failure mode you'd rather deal
+with. We didn't need this for this repo (Option A already works), and
+haven't verified whether `job_workflow_ref` is also subject to the
+immutable-ID splicing described above for every account — add it to the
+debug snippet's `jq` filter if you want to check before relying on it.
 
 ### Step 3b — Add the least-privilege permission policy
 
