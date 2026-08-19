@@ -149,9 +149,18 @@ there before assuming you need to write this from scratch.
 That said, still treat it as something to **verify, not trust blindly**: the
 console-generated policy can end up broader than you want (e.g. if you left
 **GitHub branch** as `*`, it'll allow any branch/tag in the repo; if you left
-**GitHub repository** as `*` too, it'll allow any repo under that org). Open
-**Edit trust policy** and make sure it matches — or replace it with —
-exactly this:
+**GitHub repository** as `*` too, it'll allow any repo under that org).
+
+**Important caveat, found the hard way:** the "obvious" pattern below —
+matching `sub` against `repo:<owner>/<repo>:ref:refs/heads/main` — only
+applies to jobs that **don't** specify a GitHub `environment:`. Because
+[`fetch-secret.yml`](../.github/workflows/fetch-secret.yml)'s job sets
+`environment: production` (the required-reviewer gate from
+[`03-github-setup.md`](03-github-setup.md) Step 3), GitHub emits a
+completely different `sub` shape for it — see the callout below before you
+write this policy.
+
+For a plain job with **no** `environment:` key, this is correct:
 
 ```json
 {
@@ -176,14 +185,79 @@ exactly this:
 }
 ```
 
-This means: **only** a workflow run on the `main` branch of your exact repo
-can assume this role — not other branches, not PRs from forks, not other
-repos in your account. Save the change.
-
 > Want to also allow tags or `workflow_dispatch` from other branches? Use
 > `StringLike` with a pattern like `repo:owner/repo:ref:refs/heads/*` — but
 > the narrower you keep this, the smaller your blast radius if a workflow
 > file is ever compromised.
+
+#### If your job uses `environment:` (this repo's case) — use this instead
+
+Two things are different once a job is gated by a GitHub Environment:
+
+1. **The `sub` shape changes entirely.** Instead of `ref:refs/heads/<branch>`,
+   GitHub emits `repo:<owner>/<repo>:environment:<environment-name>` — there
+   is no branch/ref segment in it at all, no matter what branch the run is on.
+2. **GitHub may embed immutable numeric IDs** in the owner/repo names inside
+   `sub` — e.g. `repo:owner@177530384/repo@1339256549:environment:production`
+   — so you can't reliably pattern-match `sub` against a plain `owner/repo`
+   string. These IDs are stable even across a repo/org rename, which is the
+   point of them, but they mean the "obvious" `sub` pattern above will
+   silently never match and every run will fail with
+   `Not authorized to perform sts:AssumeRoleWithWebIdentity`
+   (see [`05-troubleshooting.md`](05-troubleshooting.md)).
+
+**Don't guess this value — read it directly from a real token.** Temporarily
+add this step to your workflow, before the AWS credentials step, run it once
+manually, then delete it:
+
+```yaml
+- name: Debug - print OIDC token claims
+  run: |
+    IDTOKEN=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+      "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
+    PAYLOAD=$(echo -n "$IDTOKEN" | cut -d '.' -f2 | tr '_-' '/+')
+    case $(( ${#PAYLOAD} % 4 )) in
+      2) PAYLOAD="${PAYLOAD}==" ;;
+      3) PAYLOAD="${PAYLOAD}=" ;;
+    esac
+    echo "$PAYLOAD" | base64 -d | jq '{aud, sub, repository, ref, repository_owner, environment}'
+```
+
+This prints the real `sub` (and other claims) for that run's actual token.
+Copy the exact `sub` value it prints — IDs and all — into an **exact**
+match. Also notice the debug output includes a clean `repository` claim
+with **no** ID suffix — worth adding alongside `sub` as a second,
+human-readable condition (AWS requires a `sub` or `job_workflow_ref`
+condition either way, so you can't rely on `repository` alone):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<AWS_ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:production",
+          "token.actions.githubusercontent.com:repository": "<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>",
+          "token.actions.githubusercontent.com:environment": "production"
+        }
+      }
+    }
+  ]
+}
+```
+
+Every condition here is `StringEquals` — no wildcards — which is both what
+AWS's own policy validator prefers (it will warn on a wildcarded `sub`) and
+the tightest possible scope: this exact repo, running under exactly the
+`production` environment. Save the change, then delete the debug step from
+the workflow once you've confirmed a run succeeds.
 
 ### Step 3b — Add the least-privilege permission policy
 

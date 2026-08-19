@@ -3,21 +3,47 @@
 ## `Not authorized to perform sts:AssumeRoleWithWebIdentity`
 
 The trust policy's `Condition` block doesn't match the token GitHub sent.
-Most common causes:
+This was the single hardest failure to debug while building this repo —
+everything *looked* correct (right account, right audience, right branch)
+and it still failed, because the actual mismatch was in a claim shape we
+hadn't considered. In order of likelihood:
 
-- **Wrong repo/owner casing** — `sub` matching is case-sensitive. Confirm
-  `repo:<owner>/<repo>:ref:refs/heads/main` in the trust policy exactly
-  matches your GitHub org/user and repo name.
-- **Running from a different branch/PR** — the trust policy in this repo
-  only allows `ref:refs/heads/main`. A workflow run triggered from a PR
-  branch or a tag won't match. That's by design for `fetch-secret.yml`
-  (see [`01-architecture.md`](01-architecture.md)) — either merge to `main`
-  first, or deliberately broaden the `StringLike` pattern if you need more.
+- **Your job uses `environment:` and the trust policy assumes a branch
+  ref.** This was the actual root cause here. If the job has
+  `environment: production` (as `fetch-secret.yml` does, for the
+  required-reviewer gate), GitHub's `sub` claim is
+  `repo:<owner>/<repo>:environment:production` — there is **no**
+  `ref:refs/heads/...` segment at all, ever, regardless of which branch the
+  run is on. A trust policy written to match `ref:refs/heads/main` will
+  never match an environment-gated job's token, full stop. See
+  [`02-aws-console-setup.md`](02-aws-console-setup.md) Step 3a for the
+  correct pattern.
+- **GitHub embeds immutable numeric IDs in `sub`.** Even after fixing the
+  branch-vs-environment shape, the `sub` claim can look like
+  `repo:owner@177530384/repo@1339256549:environment:production` — with IDs
+  spliced into the owner/repo names. A plain-text `StringLike` pattern like
+  `repo:owner/repo:*` will **not** match this, because the literal prefix
+  before the wildcard no longer matches character-for-character. Don't
+  guess — decode a real token and copy the exact value (see the debug
+  snippet in Step 3a).
+- **AWS rejects a trust policy with no scoped `sub`/`job_workflow_ref`
+  condition at all.** If you try to drop `sub` entirely and rely only on
+  `repository`/`environment` conditions, AWS's console will refuse to save
+  the policy with an error naming this requirement explicitly. You must
+  keep a `sub` condition; it just doesn't have to be your only one.
+- **Wrong repo/owner casing** — `sub`/`repository` matching is
+  case-sensitive. Confirm the trust policy's values exactly match your
+  GitHub org/user and repo name.
 - **Missing `id-token: write` permission** — check the workflow file has
   `permissions: id-token: write` at the job or workflow level. Without it,
   GitHub never issues an OIDC token to request in the first place.
 - **`aud` mismatch** — must be exactly `sts.amazonaws.com` in both the OIDC
   provider's configured audience and the trust policy condition.
+
+**If in doubt, don't keep editing the policy by guesswork** — add the debug
+step from [`02-aws-console-setup.md`](02-aws-console-setup.md) Step 3a,
+run the workflow once, and read the actual claims GitHub sent. Every cause
+above was ultimately found this way, not by re-reading the policy JSON.
 
 ## `AccessDeniedException` when calling `GetSecretValue`
 

@@ -95,6 +95,24 @@ time, the other at PR/CI time.
   INFO: Pretending to call an external API with the secret... success!
   ```
 
+### Verifying the actual secret value (optional, one-off)
+
+`fetch-secret.yml`'s manual dispatch has a checkbox: **"Print the raw secret
+value in logs (debug only - leave off)"**. It's wired to a `SHOW_RAW_SECRET`
+environment variable that [`fetch_secret.py`](../app/fetch_secret.py)
+checks — when true, it logs the raw value (with a loud `WARNING` prefix)
+*in addition to* the normal masked line, so you can confirm the pipeline
+is actually pulling the value you expect it to.
+
+Use it like this: **Actions → Fetch Secret from AWS → Run workflow**, check
+the box, run it, read the `WARNING: Raw secret value: ...` line in the
+**Fetch and use secret** step, confirm it's correct, then **leave the box
+unchecked for every run after that**. It defaults to `false` and only
+applies to manual `workflow_dispatch` runs — a plain push to `main` never
+sets it — but there's nothing stopping someone from checking it
+accidentally, so treat it as a one-time verification tool, not something to
+leave on.
+
 ## Next
 
 Read [`04-security-best-practices.md`](04-security-best-practices.md) for
