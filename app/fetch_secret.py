@@ -38,12 +38,24 @@ def mask(value: str, visible: int = 2) -> str:
     return value[:visible] + "*" * (len(value) - visible)
 
 
-def use_secret(secret: dict) -> None:
-    """Demonstrate using the secret without ever exposing its raw value."""
+def use_secret(secret: dict, reveal: bool = False) -> None:
+    """Demonstrate using the secret without exposing its raw value by default.
+
+    `reveal` is an explicit, opt-in escape hatch for one-off manual
+    verification (e.g. confirming the correct secret is being fetched while
+    debugging OIDC/IAM setup) — it must never be left on for normal runs.
+    """
     api_key = secret.get("demo_api_key")
     if not api_key:
         logger.error("Secret payload is missing the 'demo_api_key' field")
         sys.exit(1)
+
+    if reveal:
+        logger.warning(
+            "SHOW_RAW_SECRET is enabled - printing the raw secret value. "
+            "This is for one-off manual verification only; turn it off again."
+        )
+        logger.warning("Raw secret value: %s", api_key)
 
     logger.info("Retrieved secret (masked): %s (length=%d)", mask(api_key), len(api_key))
     logger.info("Pretending to call an external API with the secret... success!")
@@ -52,13 +64,14 @@ def use_secret(secret: dict) -> None:
 def main() -> None:
     secret_name = os.environ.get("SECRET_NAME")
     region_name = os.environ.get("AWS_REGION", "us-east-1")
+    reveal = os.environ.get("SHOW_RAW_SECRET", "false").lower() == "true"
 
     if not secret_name:
         logger.error("SECRET_NAME environment variable is not set")
         sys.exit(1)
 
     secret = get_secret(secret_name, region_name)
-    use_secret(secret)
+    use_secret(secret, reveal=reveal)
 
 
 if __name__ == "__main__":

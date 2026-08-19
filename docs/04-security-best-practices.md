@@ -10,8 +10,7 @@
 | Secret value never logged or printed | [`fetch_secret.py`](../app/fetch_secret.py) `mask()` | Defense in depth — GitHub redacts registered secrets from logs automatically, but a value that was never a *registered* GitHub secret (it's fetched at runtime from AWS, not stored in GitHub) wouldn't be redacted, so the app masks it itself. |
 | Two-workflow split (safe CI vs. AWS-touching) | [`ci.yml`](../.github/workflows/ci.yml) vs [`fetch-secret.yml`](../.github/workflows/fetch-secret.yml) | PRs — including from forks — can never reach AWS credentials, because only `fetch-secret.yml` requests `id-token: write` and only it runs on `main`/manual dispatch. |
 | Required-reviewer Environment gate | [`03-github-setup.md`](03-github-setup.md) Step 3 | A human must approve before the workflow can actually call AWS, even on `main`. |
-| Branch protection + required status checks | [`03-github-setup.md`](03-github-setup.md) Step 4 | No unreviewed code reaches `main`. |
-| Secret scanning (gitleaks in CI + GitHub push protection) | [`ci.yml`](../.github/workflows/ci.yml), [`03-github-setup.md`](03-github-setup.md) Step 5 | Two independent layers catch an accidentally committed credential before and after it reaches the remote. |
+| Secret scanning (gitleaks in CI + GitHub push protection) | [`ci.yml`](../.github/workflows/ci.yml), [`03-github-setup.md`](03-github-setup.md) Step 4 | Two independent layers catch an accidentally committed credential before and after it reaches the remote. |
 | Unit tests use a mocked AWS (`moto`), not real credentials | [`test_fetch_secret.py`](../app/tests/test_fetch_secret.py) | CI never needs real AWS access to verify the app logic, shrinking the credential surface further. |
 
 ## What a real production deployment should add on top
@@ -44,6 +43,11 @@ manual-console setup simple) but worth knowing about:
   distinct dev/staging/prod AWS accounts (via AWS Organizations) rather than
   one account with a "production" secret, so a mistake in one environment
   can't reach another.
+- **Branch protection on `main`** (require PR review, required status
+  checks, no bypassing for admins) — general repo hygiene rather than
+  something specific to the secrets/OIDC pattern this repo demonstrates, so
+  it's left out of [`03-github-setup.md`](03-github-setup.md), but any real
+  project should still have it.
 
 ## Next
 

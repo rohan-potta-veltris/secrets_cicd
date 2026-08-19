@@ -41,34 +41,50 @@ This gates [`fetch-secret.yml`](../.github/workflows/fetch-secret.yml) behind
 a manual approval, so an accidental push to `main` can't silently pull the
 secret without a human noticing.
 
+> If you've already created a `production` environment (e.g. while poking
+> around **Settings → Environments** earlier), you don't need to create it
+> again — GitHub won't let you create a duplicate anyway. Just click into
+> the existing one and pick up at step 2 below.
+
 1. **Settings → Environments → New environment**, name it `production`.
 2. Under **Deployment protection rules**, check **Required reviewers** and
-   add yourself (or your team).
+   add yourself (or your team). This is the part that actually matters —
+   an environment with no protection rules exists but doesn't gate anything.
 3. Save.
 
-## Step 4 — Enable branch protection on `main`
+## Step 4 — Enable secret scanning (GitHub-native, in addition to gitleaks)
 
-**Settings → Branches → Add branch protection rule**, branch name pattern
-`main`:
+Go to the **Security** tab → **Security and quality** (GitHub has renamed
+this section a few times — older docs/screenshots call it "Code security
+and analysis"; look for the tab next to **Insights**).
 
-- ✅ Require a pull request before merging
-- ✅ Require approvals (at least 1)
-- ✅ Require status checks to pass before merging → select the `lint-and-test`
-  and `secret-scan` jobs from `ci.yml` once they've run at least once
-- ✅ Do not allow bypassing the above settings (even for admins, if you want
-  the rule to actually hold)
+- **Secret scanning alerts** — for a **public** repo, GitHub enables this by
+  default, so you may see it already showing **Enabled**. If so, nothing to
+  do here — just confirm it via **View detected secrets**. For a private
+  repo, click to enable it.
+- **Push protection** — a stricter mode that blocks the push itself (not
+  just alerts after the fact) when it detects a recognizable secret pattern.
+  This is a separate toggle from plain secret scanning and is not always on
+  by default even on public repos — check for it and enable it if present.
 
-## Step 5 — Enable secret scanning (GitHub-native, in addition to gitleaks)
+This step is really just a **verification**, not a from-scratch setup, since
+both are commonly on by default for public repos. On the same page (GitHub
+currently nests this under **Code scanning → Protection rules**, alongside
+CodeQL's settings — not the most intuitive placement, but that's where it
+lives), you'll see **Secret Protection** and **Push protection** rows with
+an **Enable**/**Disable** button next to each. The button always shows the
+action you *could* take, not the current state — so a button reading
+**Disable** means the feature is already **on**, and you don't need to
+click it.
 
-**Settings → Code security and analysis**, enable:
-- **Secret scanning** (and **Push protection**, if available on your plan) —
-  this blocks commits containing recognizable secret patterns *before* they
-  even reach the repo, as a second layer alongside the `gitleaks` job in `ci.yml`.
+Either way, this is a second, independent layer alongside the `gitleaks`
+job in [`ci.yml`](../.github/workflows/ci.yml) — one catches it at push
+time, the other at PR/CI time.
 
-## Step 6 — Trigger the pipeline
+## Step 5 — Trigger the pipeline
 
 - Open a PR that touches `app/` — confirm `ci.yml`'s `lint-and-test` and
-  `secret-scan` jobs run and pass, and that merging is blocked until they do.
+  `secret-scan` jobs run and pass.
 - Merge to `main` (or use **Actions → Fetch Secret from AWS → Run workflow**
   for manual `workflow_dispatch`) — confirm the run pauses for your
   `production` environment approval, then succeeds and logs a masked secret

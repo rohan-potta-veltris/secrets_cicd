@@ -81,7 +81,7 @@ You now have a provider ARN like:
    see [`04-security-best-practices.md`](04-security-best-practices.md)).
 5. Click **Next**.
 6. Secret name: `cicd-demo/api-key` (or any name — just keep it consistent
-   with what you put in your GitHub repo variables in Step 5 of
+   with what you put in your GitHub repo variables in Step 2 of
    [`03-github-setup.md`](03-github-setup.md)).
 7. Click **Next** twice (skip automatic rotation for this learning project),
    then **Store**.
@@ -131,7 +131,10 @@ architecture diagram) the right action for the trust policy.
    end up looser than intended, so verify/replace it explicitly.
 6. Click **Next**. **Don't attach any AWS managed policies** — you'll add a
    tightly-scoped inline policy instead.
-7. Name the role: `github-actions-secrets-demo-role`.
+7. Name the role: `github-actions-secrets-demo-role` (or any name you
+   prefer, e.g. `cidc_test_role` — the name itself has no functional effect,
+   it's just what you'll recognize it by in the console and what you'll see
+   in the ARN in Step 3c below).
 8. Click **Create role**.
 
 ### Step 3a — Lock down the trust policy

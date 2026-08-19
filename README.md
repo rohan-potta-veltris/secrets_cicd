@@ -41,7 +41,7 @@ secrets_cicd/
 
 1. [`docs/01-architecture.md`](docs/01-architecture.md) — how OIDC federation works and why
 2. [`docs/02-aws-console-setup.md`](docs/02-aws-console-setup.md) — create the OIDC provider, IAM role, and secret in AWS
-3. [`docs/03-github-setup.md`](docs/03-github-setup.md) — wire it up in GitHub (variables, Environments, branch protection)
+3. [`docs/03-github-setup.md`](docs/03-github-setup.md) — wire it up in GitHub (variables, Environments, secret scanning)
 4. [`docs/04-security-best-practices.md`](docs/04-security-best-practices.md) — why each choice was made, and what a real production setup adds
 5. [`docs/05-troubleshooting.md`](docs/05-troubleshooting.md) — common errors and fixes
 
@@ -52,7 +52,7 @@ secrets_cicd/
 - ✅ IAM permission policy scoped to one action (`GetSecretValue`) on one secret ARN
 - ✅ Secret value never printed or logged — the app masks it before any output
 - ✅ AWS-touching workflow is fully separate from the PR-facing CI workflow, so forked PRs can never reach AWS
-- ✅ Manual-approval Environment gate + branch protection + dual-layer secret scanning (gitleaks + GitHub push protection)
+- ✅ Manual-approval Environment gate + dual-layer secret scanning (gitleaks + GitHub push protection)
 
 See [`docs/04-security-best-practices.md`](docs/04-security-best-practices.md) for the full rationale.
 
