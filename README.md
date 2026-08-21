@@ -22,9 +22,6 @@ flowchart LR
     B -->|OIDC token| C[AWS STS<br/>AssumeRoleWithWebIdentity]
     C -->|temp credentials| D[AWS Secrets Manager<br/>GetSecretValue]
     D --> E[App uses secret,<br/>never logs raw value]
-
-    F[Pull Request] --> G[GitHub Actions:<br/>ci.yml — lint, test, secret-scan]
-    G -.no AWS access.-> H((blocked by design))
 ```
 
 Full details in [`docs/01-architecture.md`](docs/01-architecture.md).
