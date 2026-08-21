@@ -142,7 +142,7 @@ architecture diagram) the right action for the trust policy.
 5. Click **Create role**.
 
 Once the trust policy is finalized in Step 3a below, see
-[`06-trust-policy-explained.md`](06-trust-policy-explained.md) for a full
+[`04-trust-policy-explained.md`](04-trust-policy-explained.md) for a full
 line-by-line breakdown of what it does and why.
 
 ### Step 3a — Lock down the trust policy
@@ -266,7 +266,7 @@ claim even when `sub` uses the environment format, so adding this condition
 costs nothing and closes the gap. Save it.
 
 Want this policy explained condition-by-condition, line by line? See
-[`06-trust-policy-explained.md`](06-trust-policy-explained.md).
+[`04-trust-policy-explained.md`](04-trust-policy-explained.md).
 
 > **Alternative claim: `job_workflow_ref`.** AWS's own policy validator
 > error names this as the other accepted claim besides `sub`

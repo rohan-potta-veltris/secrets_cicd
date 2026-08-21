@@ -38,7 +38,7 @@ secrets_cicd/
 1. [`docs/01-architecture.md`](docs/01-architecture.md) — how OIDC federation works and why
 2. [`docs/02-aws-console-setup.md`](docs/02-aws-console-setup.md) — create the OIDC provider, IAM role, and secret in AWS
 3. [`docs/03-github-setup.md`](docs/03-github-setup.md) — wire it up in GitHub (variables, Environments, secret scanning)
-4. [`docs/06-trust-policy-explained.md`](docs/06-trust-policy-explained.md) — the final IAM trust policy, explained line by line
+4. [`docs/04-trust-policy-explained.md`](docs/04-trust-policy-explained.md) — the final IAM trust policy, explained line by line
 
 ## Security highlights
 
