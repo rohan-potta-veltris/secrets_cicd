@@ -24,8 +24,6 @@ flowchart LR
     D --> E[App uses secret,<br/>never logs raw value]
 ```
 
-Full details in [`docs/01-architecture.md`](docs/01-architecture.md).
-
 ## Repo layout
 
 ```
