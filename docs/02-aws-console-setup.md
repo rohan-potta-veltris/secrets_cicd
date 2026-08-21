@@ -150,48 +150,14 @@ console-generated policy can end up broader than you want (e.g. if you left
 **GitHub branch** as `*`, it'll allow any branch/tag in the repo; if you left
 **GitHub repository** as `*` too, it'll allow any repo under that org).
 
-**Important caveat, found the hard way:** the "obvious" pattern below —
-matching `sub` against `repo:<owner>/<repo>:ref:refs/heads/main` — only
-applies to jobs that **don't** specify a GitHub `environment:`. Because
-[`fetch-secret.yml`](../.github/workflows/fetch-secret.yml)'s job sets
-`environment: production` (the required-reviewer gate from
+**Important caveat, found the hard way:** a naive pattern matching `sub`
+against `repo:<owner>/<repo>:ref:refs/heads/main` would **not** work here.
+That pattern only applies to jobs that don't specify a GitHub
+`environment:`. Because [`fetch-secret.yml`](../.github/workflows/fetch-secret.yml)'s
+job sets `environment: production` (the required-reviewer gate from
 [`03-github-setup.md`](03-github-setup.md) Step 3), GitHub emits a
-completely different `sub` shape for it — see the callout below before you
-write this policy.
-
-For a plain job with **no** `environment:` key, this is correct:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::<AWS_ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-        },
-        "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>:ref:refs/heads/main"
-        }
-      }
-    }
-  ]
-}
-```
-
-> Want to also allow tags or `workflow_dispatch` from other branches? Use
-> `StringLike` with a pattern like `repo:owner/repo:ref:refs/heads/*` — but
-> the narrower you keep this, the smaller your blast radius if a workflow
-> file is ever compromised.
-
-#### If your job uses `environment:` (this repo's case) — use this instead
-
-Two things are different once a job is gated by a GitHub Environment:
+completely different `sub` shape for it. Two things are different once a
+job is gated by a GitHub Environment:
 
 1. **The `sub` shape changes entirely.** Instead of `ref:refs/heads/<branch>`,
    GitHub emits `repo:<owner>/<repo>:environment:<environment-name>` — there
