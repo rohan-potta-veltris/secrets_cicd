@@ -18,17 +18,17 @@ hadn't considered. In order of likelihood:
   never match an environment-gated job's token, full stop. See
   [`02-aws-console-setup.md`](02-aws-console-setup.md) Step 3a for the
   correct pattern.
-- **GitHub embeds immutable numeric IDs in `sub`.** Even after fixing the
-  branch-vs-environment shape, the `sub` claim can look like
-  `repo:owner@177530384/repo@1339256549:environment:production` — with IDs
+- **GitHub embeds immutable numeric IDs in `sub`, and they weren't pinned
+  correctly.** The `sub` claim looks like
+  `repo:owner@177530384/repo@1339256549:environment:production` — IDs
   spliced into the *middle* of the owner/repo names, not appended at the
-  end. A pattern like `repo:owner/repo:*` will **not** match this, because
-  the literal `owner/repo` text before the final `*` no longer matches
-  character-for-character (the ID lands before that point, not after). You
-  don't need to decode a token to fix this, though — put the wildcard right
-  after each name instead: `repo:owner*/repo*:environment:production`. Only
-  reach for decoding a real token (see Step 3a, Option B) if you want an
-  exact match with zero wildcards.
+  end. Get your exact IDs from repo **Settings → Actions → OIDC** (or the
+  GitHub API) and use them verbatim — see
+  [`02-aws-console-setup.md`](02-aws-console-setup.md) Step 3a. Don't try
+  to wildcard the ID away (`repo:owner*/repo*:...`) — it technically
+  matches, but it also defeats the anti-namespace-recycling protection
+  this feature exists for, which is a real security regression, not just
+  an aesthetic preference.
 - **AWS rejects a trust policy with no scoped `sub`/`job_workflow_ref`
   condition at all.** If you try to drop `sub` entirely and rely only on
   `repository`/`environment` conditions, AWS's console will refuse to save
@@ -43,10 +43,29 @@ hadn't considered. In order of likelihood:
 - **`aud` mismatch** — must be exactly `sts.amazonaws.com` in both the OIDC
   provider's configured audience and the trust policy condition.
 
-**If in doubt, don't keep editing the policy by guesswork** — add the debug
-step from [`02-aws-console-setup.md`](02-aws-console-setup.md) Step 3a,
-run the workflow once, and read the actual claims GitHub sent. Every cause
-above was ultimately found this way, not by re-reading the policy JSON.
+**If in doubt, don't keep editing the policy by guesswork** — decode a real
+token and read the actual claims GitHub sent, instead of re-reading the
+policy JSON. Temporarily add this step to your workflow before the AWS
+credentials step, run it once, then delete it:
+
+```yaml
+- name: Debug - print OIDC token claims
+  run: |
+    IDTOKEN=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+      "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
+    PAYLOAD=$(echo -n "$IDTOKEN" | cut -d '.' -f2 | tr '_-' '/+')
+    case $(( ${#PAYLOAD} % 4 )) in
+      2) PAYLOAD="${PAYLOAD}==" ;;
+      3) PAYLOAD="${PAYLOAD}=" ;;
+    esac
+    echo "$PAYLOAD" | base64 -d | jq '{aud, sub, repository, ref, repository_owner, environment}'
+```
+
+Every cause above was ultimately found this way, not by re-reading the
+policy JSON — though for just getting your IDs to write the *first*
+version of the policy (rather than debugging a mismatch), the UI/API
+lookup in [`02-aws-console-setup.md`](02-aws-console-setup.md) Step 3a is
+simpler and doesn't need a workflow to exist yet.
 
 ## `AccessDeniedException` when calling `GetSecretValue`
 

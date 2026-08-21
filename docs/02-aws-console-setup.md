@@ -197,20 +197,53 @@ Two things are different once a job is gated by a GitHub Environment:
 1. **The `sub` shape changes entirely.** Instead of `ref:refs/heads/<branch>`,
    GitHub emits `repo:<owner>/<repo>:environment:<environment-name>` — there
    is no branch/ref segment in it at all, no matter what branch the run is on.
-2. **GitHub may embed immutable numeric IDs** in the owner/repo names inside
-   `sub` — e.g. `repo:owner@177530384/repo@1339256549:environment:production`
-   — so you can't reliably pattern-match `sub` against a plain `owner/repo`
-   string. These IDs are stable even across a repo/org rename, which is the
-   point of them, but they mean the "obvious" `sub` pattern above will
-   silently never match and every run will fail with
-   `Not authorized to perform sts:AssumeRoleWithWebIdentity`
-   (see [`05-troubleshooting.md`](05-troubleshooting.md)).
+2. **GitHub embeds immutable numeric IDs** in the owner/repo names inside
+   `sub` — e.g. `repo:owner@177530384/repo@1339256549:environment:production`.
+   This isn't a quirk or a bug — it's a deliberate GitHub security feature
+   ([announced April 2026](https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens/)):
+   **every repository created after July 15, 2026 gets this format
+   automatically, with no opt-out.** It exists to close a real vulnerability
+   called *namespace recycling* — without the ID, if your GitHub org/repo
+   name were ever deleted and re-registered by someone else, their new
+   repo's token would produce the exact same `sub` string as yours, and any
+   trust policy matching on the plain name would trust them too. The numeric
+   ID is permanently tied to your specific repo and can never be reused by
+   anyone else, even if the name is.
 
-You don't need to know your repo's exact immutable IDs up front — there are
-two valid ways to write this policy, and only one of them requires any
-extra work:
+**Because of what this feature protects against, do not wildcard the ID
+away.** A pattern like `repo:<owner>*/<repo>*:environment:production`
+technically "works" (AWS will save it, and it'll match your token), but it
+defeats the entire point: if your org/repo name is ever recycled by a
+different account, their token would *still* satisfy the wildcard, since
+the literal name prefix is identical and the wildcard just absorbs whatever
+ID follows. The [AWS community guidance on this change](https://dev.to/aws-builders/github-changed-its-oidc-subject-claims-and-broke-my-aws-deploys-for-new-repos-2cfp)
+is explicit: **pin the ID, don't wildcard it.**
 
-**Option A — wildcard the ID, works immediately for any new project (start here):**
+**Getting your exact IDs doesn't require running a workflow — and doesn't
+require the command line either.** Two ways to get them, easiest first:
+
+- **Via the UI:** go to the repo's **Settings → Actions → OIDC**. GitHub
+  added a preview there specifically for this feature that shows you the
+  exact subject claim prefix — including your real IDs — that your tokens
+  will use. No CLI, no API call, just read it off the page.
+- **Via the API** (handy if you're scripting this, or want to confirm a
+  different account/repo without opening the UI): the same numeric IDs are
+  returned by GitHub's public REST API for any user/org and repo:
+
+  ```bash
+  curl -s https://api.github.com/users/<YOUR_GITHUB_USERNAME> | grep '"id"'
+  curl -s https://api.github.com/repos/<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME> | grep '"id"'
+  ```
+
+  (For a **private** repo, add `-H "Authorization: Bearer <a PAT>"` — the
+  unauthenticated endpoint only sees public repos.)
+
+Either way: the owner ID is the same for every repo you own — look it up
+once and reuse it. If you add another repo under the same account later,
+you only need to look up that new repo's ID. Both values are stable and
+knowable before you've written a single workflow run.
+
+With both numbers in hand, write the trust policy as an exact match:
 
 ```json
 {
@@ -225,11 +258,9 @@ extra work:
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:production",
           "token.actions.githubusercontent.com:repository": "<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>",
           "token.actions.githubusercontent.com:environment": "production"
-        },
-        "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:<YOUR_GITHUB_USERNAME>*/<YOUR_REPO_NAME>*:environment:production"
         }
       }
     }
@@ -237,63 +268,26 @@ extra work:
 }
 ```
 
-Just substitute your own owner/repo names — no debugging, no token
-decoding, nothing to look up. The trailing `*` after each name absorbs
-GitHub's optional `@<id>` suffix wherever it does or doesn't appear; the
-literal `repo:<owner>` and `/<repo>` text before each `*` still has to
-match exactly, so this isn't meaningfully looser than knowing the real IDs
-— a different repo's token can never satisfy this pattern. AWS's console
-will show an advisory warning about the wildcard in `sub` (it doesn't know
-the wildcard only ever consumes an internal ID), but it still saves fine —
-this is what actually got this repo working the first time.
+Every condition is `StringEquals` — no wildcards anywhere. This is the
+version that actually preserves the anti-recycling protection the immutable
+ID feature is for, and it's what this repo's role is really configured
+with. Save it.
 
-**Option B — exact match, no wildcards, for eliminating that warning:**
+> **Alternative claim: `job_workflow_ref`.** AWS's own policy validator
+> error names this as the other accepted claim besides `sub`
+> (`"...must evaluate...sub or job_workflow_ref..."`). It pins to the
+> workflow **file** instead of the repo+environment:
+> `"token.actions.githubusercontent.com:job_workflow_ref": "<owner>/<repo>/.github/workflows/fetch-secret.yml@refs/heads/main"`.
+> Not obviously better or worse — it breaks if you rename/move the workflow
+> file instead of if you rename the environment. This repo doesn't use it,
+> and we haven't verified whether it also carries immutable IDs.
 
-If Option A works but you want to clear the console warning, or you just
-prefer zero wildcards, you can look up your repo's exact IDs by adding this
-step to your workflow temporarily, running it once, then deleting it:
-
-```yaml
-- name: Debug - print OIDC token claims
-  run: |
-    IDTOKEN=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-      "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
-    PAYLOAD=$(echo -n "$IDTOKEN" | cut -d '.' -f2 | tr '_-' '/+')
-    case $(( ${#PAYLOAD} % 4 )) in
-      2) PAYLOAD="${PAYLOAD}==" ;;
-      3) PAYLOAD="${PAYLOAD}=" ;;
-    esac
-    echo "$PAYLOAD" | base64 -d | jq '{aud, sub, repository, ref, repository_owner, environment}'
-```
-
-Then swap Option A's `StringLike` block for an exact `StringEquals` line
-using the printed `sub` value verbatim (IDs included):
-
-```json
-"token.actions.githubusercontent.com:sub": "repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:production"
-```
-
-This is optional hardening, not a requirement — Option A is already
-correctly scoped to this exact repo and environment. Save whichever
-version you choose.
-
-**Option C — match `job_workflow_ref` instead of `sub`:** AWS's validator
-error explicitly names this as the other accepted claim
-(`sub` **or** `job_workflow_ref`). Instead of pinning to a repo+environment,
-it pins to the actual **workflow file that ran**:
-
-```json
-"token.actions.githubusercontent.com:job_workflow_ref": "<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>/.github/workflows/fetch-secret.yml@refs/heads/main"
-```
-
-This isn't obviously better or worse than Options A/B — it's a different
-axis of coupling. `sub`-based matching breaks if you rename the
-environment; `job_workflow_ref`-based matching breaks if you rename or
-move the workflow file. Pick whichever failure mode you'd rather deal
-with. We didn't need this for this repo (Option A already works), and
-haven't verified whether `job_workflow_ref` is also subject to the
-immutable-ID splicing described above for every account — add it to the
-debug snippet's `jq` filter if you want to check before relying on it.
+> **Debugging alternative:** if you ever need to see a token's claims
+> directly (e.g. something doesn't match and you're not sure why), you can
+> still decode a real one from inside a workflow run — see
+> [`05-troubleshooting.md`](05-troubleshooting.md) for that snippet. For
+> just getting the IDs to write the policy in the first place, the API
+> calls above are simpler and don't require a workflow to exist yet.
 
 ### Step 3b — Add the least-privilege permission policy
 
