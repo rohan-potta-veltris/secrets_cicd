@@ -106,11 +106,16 @@ identity** is the trusted-entity type that matches what we registered in
 Step 1, and it's what makes `AssumeRoleWithWebIdentity` (the API call in the
 architecture diagram) the right action for the trust policy.
 
-1. Go to **IAM Console → Roles → Create role**.
-2. Trusted entity type: **Web identity**.
-3. Identity provider: select `token.actions.githubusercontent.com` (created in Step 1).
-4. Audience: `sts.amazonaws.com`.
-5. The console shows **GitHub organization** (required), **GitHub
+1. Right after creating the OIDC provider in Step 1, AWS shows a success
+   banner with an **Assign role** button — click it. This carries the
+   provider and audience over automatically and drops you straight into
+   role creation with **Trusted entity type: Web identity** and
+   **Identity provider: `token.actions.githubusercontent.com`** already
+   selected, so there's nothing to pick manually here.
+   (Starting fresh instead via **IAM Console → Roles → Create role**? Set
+   those two fields yourself, plus **Audience: `sts.amazonaws.com`**, to
+   land on the same screen.)
+2. The next screen shows **GitHub organization** (required), **GitHub
    repository** (optional), and **GitHub branch** (optional) fields — these
    pre-fill part of the trust policy for you. They come from your GitHub
    repo's identity, not from anything in AWS, so decide your GitHub
@@ -128,18 +133,22 @@ architecture diagram) the right action for the trust policy.
    condition close to the one in Step 3a below — but **don't skip Step 3a**:
    depending on which fields you left blank, the auto-generated policy can
    end up looser than intended, so verify/replace it explicitly.
-6. Click **Next**. **Don't attach any AWS managed policies** — you'll add a
+3. Click **Next**. **Don't attach any AWS managed policies** — you'll add a
    tightly-scoped inline policy instead.
-7. Name the role: `github-actions-secrets-demo-role` (or any name you
+4. Name the role: `github-actions-secrets-demo-role` (or any name you
    prefer, e.g. `cidc_test_role` — the name itself has no functional effect,
    it's just what you'll recognize it by in the console and what you'll see
    in the ARN in Step 3c below).
-8. Click **Create role**.
+5. Click **Create role**.
+
+Once the trust policy is finalized in Step 3a below, see
+[`06-trust-policy-explained.md`](06-trust-policy-explained.md) for a full
+line-by-line breakdown of what it does and why.
 
 ### Step 3a — Lock down the trust policy
 
 If you filled in the **GitHub organization** / **GitHub repository** /
-**GitHub branch** fields in Step 3.5 above, AWS may have already generated a
+**GitHub branch** fields in Step 3.2 above, AWS may have already generated a
 trust policy close to (or identical to) the one below — the console uses
 those three fields to pre-fill the `sub` condition's `StringLike` pattern
 for you. Open the new role → **Trust relationships** tab and check what's
