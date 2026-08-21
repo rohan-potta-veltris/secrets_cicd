@@ -112,10 +112,3 @@ applies to manual `workflow_dispatch` runs — a plain push to `main` never
 sets it — but there's nothing stopping someone from checking it
 accidentally, so treat it as a one-time verification tool, not something to
 leave on.
-
-## Next
-
-Read [`04-security-best-practices.md`](04-security-best-practices.md) for
-why each of these choices matters and what to add for a real production
-deployment. If something above fails, check
-[`05-troubleshooting.md`](05-troubleshooting.md).

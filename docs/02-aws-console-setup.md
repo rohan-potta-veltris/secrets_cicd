@@ -277,13 +277,6 @@ Want this policy explained condition-by-condition, line by line? See
 > file instead of if you rename the environment. This repo doesn't use it,
 > and we haven't verified whether it also carries immutable IDs.
 
-> **Debugging alternative:** if you ever need to see a token's claims
-> directly (e.g. something doesn't match and you're not sure why), you can
-> still decode a real one from inside a workflow run — see
-> [`05-troubleshooting.md`](05-troubleshooting.md) for that snippet. For
-> just getting the IDs to write the policy in the first place, the API
-> calls above are simpler and don't require a workflow to exist yet.
-
 ### Step 3b — Add the least-privilege permission policy
 
 On the same role, go to **Permissions** tab → **Add permissions → Create
