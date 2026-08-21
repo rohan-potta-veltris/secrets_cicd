@@ -222,10 +222,17 @@ is explicit: **pin the ID, don't wildcard it.**
 **Getting your exact IDs doesn't require running a workflow — and doesn't
 require the command line either.** Two ways to get them, easiest first:
 
-- **Via the UI:** go to the repo's **Settings → Actions → OIDC**. GitHub
-  added a preview there specifically for this feature that shows you the
-  exact subject claim prefix — including your real IDs — that your tokens
-  will use. No CLI, no API call, just read it off the page.
+- **Via the UI (confirmed, this is the easiest option):** go to the repo's
+  **Settings → Actions → OIDC**. Under **Subject claim**, you'll see:
+  - **Use default template** (checked) and **Use immutable subject claim**
+    (checked, greyed out/locked — "Automatically enabled for this
+    repository" for repos created after July 15, 2026)
+  - A **Default subject claim prefix** box showing the exact value, e.g.
+    `repo:<owner>@<owner-id>/<repo>@<repo-id>` with a green checkmark next
+    to it, and the hint text "Use this prefix when configuring trust
+    policies in your cloud provider" — which is exactly what you're doing
+    here. No CLI, no API call, no workflow run — just read the value
+    straight off this box.
 - **Via the API** (handy if you're scripting this, or want to confirm a
   different account/repo without opening the UI): the same numeric IDs are
   returned by GitHub's public REST API for any user/org and repo:
