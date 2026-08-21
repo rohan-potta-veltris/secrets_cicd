@@ -267,7 +267,8 @@ With both numbers in hand, write the trust policy as an exact match:
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           "token.actions.githubusercontent.com:sub": "repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:production",
           "token.actions.githubusercontent.com:repository": "<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>",
-          "token.actions.githubusercontent.com:environment": "production"
+          "token.actions.githubusercontent.com:environment": "production",
+          "token.actions.githubusercontent.com:ref": "refs/heads/main"
         }
       }
     }
@@ -275,10 +276,20 @@ With both numbers in hand, write the trust policy as an exact match:
 }
 ```
 
-Every condition is `StringEquals` — no wildcards anywhere. This is the
-version that actually preserves the anti-recycling protection the immutable
-ID feature is for, and it's what this repo's role is really configured
-with. Save it.
+Every condition is `StringEquals` — no wildcards anywhere.
+
+**Why the `ref` condition matters here, specifically:** an environment-based
+`sub` (`...:environment:production`) is emitted identically **no matter
+which branch triggered the run** — `fetch-secret.yml` allows
+`workflow_dispatch` from any branch selection, so without `ref`, a run
+dispatched from a non-`main` branch would still produce a `sub` that
+matches. AWS's console will actually warn you about this if you save the
+policy without it ("Using a wildcard... specify the branch name... in a
+`ref` condition key") — not because there's a literal wildcard character
+anywhere, but because omitting branch info from the only scoping claim is
+functionally the same thing. GitHub still emits `ref` as its own top-level
+claim even when `sub` uses the environment format, so adding this condition
+costs nothing and closes the gap. Save it.
 
 > **Alternative claim: `job_workflow_ref`.** AWS's own policy validator
 > error names this as the other accepted claim besides `sub`
