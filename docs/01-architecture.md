@@ -21,24 +21,6 @@ AWS trusts that token (because you registered GitHub as an OIDC identity
 provider) and exchanges it for temporary AWS credentials that expire in
 about an hour. Nothing long-lived is ever stored anywhere.
 
-## Trust flow
-
-```mermaid
-sequenceDiagram
-    participant GH as GitHub Actions runner
-    participant OIDC as GitHub OIDC provider
-    participant STS as AWS STS
-    participant SM as AWS Secrets Manager
-
-    GH->>OIDC: Request an OIDC token for this job
-    OIDC-->>GH: Signed JWT (aud=sts.amazonaws.com, sub=repo:owner/repo:ref:refs/heads/main)
-    GH->>STS: AssumeRoleWithWebIdentity(role_arn, jwt)
-    STS->>STS: Validate JWT signature against registered<br/>GitHub OIDC provider + check trust policy conditions
-    STS-->>GH: Temporary credentials (~1 hour TTL)
-    GH->>SM: GetSecretValue(secret_arn) using temp credentials
-    SM-->>GH: Secret value (masked before any logging)
-```
-
 ## Components
 
 | Component | Purpose |
