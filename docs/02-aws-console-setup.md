@@ -77,9 +77,7 @@ You now have a provider ARN like:
    - Key: `demo_api_key`
    - Value: any placeholder string for now, e.g. `local-test-value-change-me`
      (this matches the field name `app/fetch_secret.py` reads — see [`../app/fetch_secret.py`](../app/fetch_secret.py))
-4. Encryption key: leave as the default `aws/secretsmanager` KMS key (fine
-   for learning; a dedicated customer-managed key is a production upgrade —
-   see [`04-security-best-practices.md`](04-security-best-practices.md)).
+4. Encryption key: leave as the default `aws/secretsmanager` KMS key.
 5. Click **Next**.
 6. Secret name: `cicd-demo/api-key` (or any name — just keep it consistent
    with what you put in your GitHub repo variables in Step 2 of
@@ -265,10 +263,10 @@ With both numbers in hand, write the trust policy as an exact match:
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           "token.actions.githubusercontent.com:sub": "repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:production",
-          "token.actions.githubusercontent.com:repository": "<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>",
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           "token.actions.githubusercontent.com:environment": "production",
+          "token.actions.githubusercontent.com:repository": "<YOUR_GITHUB_USERNAME>/<YOUR_REPO_NAME>",
           "token.actions.githubusercontent.com:ref": "refs/heads/main"
         }
       }
