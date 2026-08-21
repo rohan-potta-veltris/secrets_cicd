@@ -11,8 +11,8 @@ This is a learning project built to demonstrate the current best-practice
 way to connect GitHub Actions to AWS: short-lived, tightly-scoped credentials
 obtained via OpenID Connect, instead of a static IAM access key pasted into
 a repo secret. Every AWS resource is created **manually in the AWS Console**
-(no Terraform) and documented step by step, so you can follow along and
-understand exactly what's being created and why — not just run a script.
+and documented step by step, so you can follow along and understand
+exactly what's being created and why — not just run a script.
 
 ## Architecture at a glance
 
