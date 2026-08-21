@@ -7,12 +7,12 @@ access keys stored in GitHub, ever.
 
 ## Why this exists
 
-This is a learning project built to demonstrate the current best-practice
-way to connect GitHub Actions to AWS: short-lived, tightly-scoped credentials
-obtained via OpenID Connect, instead of a static IAM access key pasted into
-a repo secret. Every AWS resource is created **manually in the AWS Console**
-and documented step by step, so you can follow along and understand
-exactly what's being created and why — not just run a script.
+This shows how to pull a secret out of AWS the current best-practice way:
+short-lived, tightly-scoped credentials obtained via OpenID Connect,
+instead of a static IAM access key pasted into a repo secret. Every AWS
+resource is created **manually in the AWS Console** and documented step by
+step, so you can follow along and understand exactly what's being created
+and why — not just run a script.
 
 ## Architecture at a glance
 
