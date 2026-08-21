@@ -61,7 +61,7 @@ See [`docs/04-security-best-practices.md`](docs/04-security-best-practices.md) f
 
 ```bash
 cd app
-pip install -r requirements-dev.txt
+pip install -r requirements.txt
 pytest tests/ -v          # runs against a mocked AWS (moto) — no real credentials needed
 
 # To actually fetch the real secret locally, you need real AWS credentials
