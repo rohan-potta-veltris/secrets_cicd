@@ -291,6 +291,9 @@ functionally the same thing. GitHub still emits `ref` as its own top-level
 claim even when `sub` uses the environment format, so adding this condition
 costs nothing and closes the gap. Save it.
 
+Want this policy explained condition-by-condition, line by line? See
+[`06-trust-policy-explained.md`](06-trust-policy-explained.md).
+
 > **Alternative claim: `job_workflow_ref`.** AWS's own policy validator
 > error names this as the other accepted claim besides `sub`
 > (`"...must evaluate...sub or job_workflow_ref..."`). It pins to the

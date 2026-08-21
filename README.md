@@ -44,6 +44,7 @@ secrets_cicd/
 3. [`docs/03-github-setup.md`](docs/03-github-setup.md) — wire it up in GitHub (variables, Environments, secret scanning)
 4. [`docs/04-security-best-practices.md`](docs/04-security-best-practices.md) — why each choice was made, and what a real production setup adds
 5. [`docs/05-troubleshooting.md`](docs/05-troubleshooting.md) — common errors and fixes
+6. [`docs/06-trust-policy-explained.md`](docs/06-trust-policy-explained.md) — the final IAM trust policy, explained line by line
 
 ## Security highlights
 
