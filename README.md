@@ -1,8 +1,9 @@
 # Secure AWS Secrets in a GitHub Actions CI/CD Pipeline
 
-A reference implementation of a production-grade pattern: a GitHub Actions
-pipeline that securely reads a secret from **AWS Secrets Manager** using
-**OIDC federation** — no long-lived AWS access keys stored in GitHub, ever.
+A working, fully documented example of a production-grade pattern: a
+GitHub Actions pipeline that securely reads a secret from
+**AWS Secrets Manager** using **OIDC federation** — no long-lived AWS
+access keys stored in GitHub, ever.
 
 ## Why this exists
 
