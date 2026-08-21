@@ -2,6 +2,7 @@ import json
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from moto import mock_aws
 
 from fetch_secret import get_secret, mask, use_secret
@@ -28,7 +29,7 @@ def test_get_secret_returns_parsed_json(secretsmanager_client):
 
 
 def test_get_secret_raises_for_missing_secret(secretsmanager_client):
-    with pytest.raises(Exception):
+    with pytest.raises(ClientError):
         get_secret("does-not-exist", REGION)
 
 
