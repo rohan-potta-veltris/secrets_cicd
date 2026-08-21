@@ -1,8 +1,9 @@
 # AWS Console Setup (Manual, Step by Step)
 
-No Terraform or CLI scripting here on purpose — every resource is created by
-hand in the AWS Console so you can see exactly what gets created and why.
-Do these in order; later steps reference ARNs created in earlier ones.
+Follow these steps in order to set up the AWS side of the pipeline by hand
+in the Console — every resource is created manually so you can see exactly
+what gets created and why. Later steps reference ARNs created in earlier
+ones, so don't skip around.
 
 Throughout, replace:
 - `<AWS_ACCOUNT_ID>` with your 12-digit AWS account ID
